@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "Food truck ordering API with dynamic pricing powered by the Machine Payments Protocol",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "build:client": "esbuild src/client-pay.ts --bundle --format=iife --platform=browser --outfile=public/client.js --minify",
+    "build": "npm run build:client",
+    "dev": "npm run build:client && wrangler dev",
+    "deploy": "npm run build:client && wrangler deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -13,6 +15,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250313.0",
+    "esbuild": "^0.24.0",
     "typescript": "^5.7.0",
     "wrangler": "^4.0.0"
   }

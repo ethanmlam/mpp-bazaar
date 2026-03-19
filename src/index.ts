@@ -3,10 +3,8 @@ import { cors } from 'hono/cors'
 import { Credential } from 'mppx'
 import { Mppx, tempo } from 'mppx/server'
 
-// pathUSD on Tempo testnet
-const CURRENCY = '0x20c0000000000000000000000000000000000000'
-// Demo recipient — replace with your own address
-const RECIPIENT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
+// USDC on Tempo mainnet
+const CURRENCY = '0x20c000000000000000000000b9537d11c60e8b50'
 import { menu } from './menu'
 import { computePrice, type OrderItem } from './pricing'
 import { createOrder, getRecentOrders } from './orders'
@@ -17,10 +15,13 @@ const app = new Hono()
 // CORS for frontend
 app.use('/api/*', cors())
 
-// MPP server instance — only charge intent (no sessions needed)
-const mppx = Mppx.create({
-  methods: [tempo.charge({ testnet: true })],
-})
+// MPP server instance — created per-request to access env bindings
+function getMppx(env: { MPP_SECRET_KEY: string }) {
+  return Mppx.create({
+    secretKey: env.MPP_SECRET_KEY,
+    methods: [tempo.charge()],
+  })
+}
 
 // ─── Menu ────────────────────────────────────────────────────────────
 app.get('/api/menu', (c) => {
@@ -62,10 +63,14 @@ app.post('/api/order', async (c) => {
   }
 
   // Dynamic charge — this is what x402 can't do
+  const env = c.env as { MPP_SECRET_KEY: string; RECIPIENT_ADDRESS: string }
+  const mppx = getMppx(env)
+  // Scale price down 100x so demo orders cost pennies (e.g. $14.00 menu → $0.14 charge)
+  const demoAmount = (parseFloat(breakdown.total) / 100).toFixed(2)
   const response = await mppx.charge({
-    amount: breakdown.total,
+    amount: demoAmount,
     currency: CURRENCY,
-    recipient: RECIPIENT,
+    recipient: env.RECIPIENT_ADDRESS,
     description: `MPP Bazaar order: ${breakdown.items.map(i => i.name).join(', ')}`,
   })(c.req.raw)
 
@@ -74,16 +79,20 @@ app.post('/api/order', async (c) => {
     return response.challenge
   }
 
-  // Payment verified — extract payer identity from credential
+  // Payment verified — extract payer identity and tx hash from credential
   const authHeader = c.req.header('Authorization')
   let payer: string | null = null
+  let txHash: string | null = null
   if (authHeader) {
     try {
       const credential = Credential.deserialize(authHeader)
       payer = credential.source ?? null
+      const payload = credential.payload as any
+      txHash = payload?.txHash ?? payload?.transactionHash ?? payload?.hash ?? null
     } catch {}
   }
   const order = createOrder(breakdown, payer)
+  console.log(`[ORDER] ${order.id} | $${breakdown.total} | ${breakdown.items.map(i => `${i.qty}x ${i.name}`).join(', ')} | payer: ${payer ?? 'anonymous'} | tx: ${txHash ?? 'n/a'}`)
 
   return response.withReceipt(
     Response.json({
@@ -98,6 +107,7 @@ app.post('/api/order', async (c) => {
         total: breakdown.total,
       },
       payer,
+      txHash,
       createdAt: order.createdAt,
     })
   )
@@ -106,6 +116,15 @@ app.post('/api/order', async (c) => {
 // ─── Recent Orders Feed ──────────────────────────────────────────────
 app.get('/api/orders/recent', (c) => {
   return c.json({ orders: getRecentOrders(10) })
+})
+
+// ─── Client config (inject testnet key) ─────────────────────────────
+app.get('/api/config', (c) => {
+  const env = c.env as { TEMPO_PRIVATE_KEY?: string }
+  return c.json({
+    tempoKey: env.TEMPO_PRIVATE_KEY || null,
+    testnet: true,
+  })
 })
 
 // ─── Frontend ────────────────────────────────────────────────────────

@@ -10,10 +10,10 @@ function getClient() {
   if (!sharedClient) {
     sharedClient = createClient({
       chain: tempoChain,
-      transport: http('https://rpc.tempo.xyz', {
+      transport: http('https://gracious-knuth:goofy-chandrasekhar@rpc.tempo.xyz', {
         batch: true,
-        retryCount: 5,
-        retryDelay: 3000,
+        retryCount: 3,
+        retryDelay: 1000,
       }),
       batch: { multicall: true },
       pollingInterval: 120_000,

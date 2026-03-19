@@ -118,12 +118,11 @@ app.get('/api/orders/recent', (c) => {
   return c.json({ orders: getRecentOrders(10) })
 })
 
-// ─── Client config (inject testnet key) ─────────────────────────────
+// ─── Client config ───────────────────────────────────────────────────
 app.get('/api/config', (c) => {
   const env = c.env as { TEMPO_PRIVATE_KEY?: string }
   return c.json({
     tempoKey: env.TEMPO_PRIVATE_KEY || null,
-    testnet: true,
   })
 })
 

@@ -6,7 +6,6 @@
     "build:client": "esbuild src/client-pay.ts --bundle --format=iife --platform=browser --outfile=public/client.js --minify",
     "build": "npm run build:client",
     "dev": "npm run build:client && wrangler dev --port 8787",
-    "pay-proxy": "node pay-proxy.mjs",
     "deploy": "npm run build:client && wrangler deploy",
     "typecheck": "tsc --noEmit"
   },

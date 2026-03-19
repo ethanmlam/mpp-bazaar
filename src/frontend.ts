@@ -624,7 +624,7 @@ const cart = {}; // { id: qty }
 let menuData = [];
 let tempoKey = null;
 
-// Load testnet key from server config
+// Load key from server config
 fetch('/api/config').then(r => r.json()).then(cfg => {
   tempoKey = cfg.tempoKey;
 }).catch(() => {});
@@ -818,9 +818,13 @@ async function placeOrder() {
     document.getElementById('modal-body').innerHTML = bodyHtml;
     document.getElementById('pay-status').textContent = '';
     const payBtn = document.getElementById('modal-pay-btn');
-    payBtn.style.display = 'inline-block';
-    payBtn.disabled = false;
-    payBtn.textContent = 'Pay Now';
+    if (tempoKey) {
+      payBtn.style.display = 'inline-block';
+      payBtn.disabled = false;
+      payBtn.textContent = 'Pay Now';
+    } else {
+      payBtn.style.display = 'none';
+    }
     document.getElementById('modal-overlay').classList.add('open');
   } catch (e) {
     alert('Error: ' + e.message);
@@ -851,6 +855,7 @@ async function loadFeed() {
 }
 
 async function payFromBrowser() {
+  if (!tempoKey || !window.payForOrder) return;
   const items = Object.entries(cart).map(([id, qty]) => ({ id, qty }));
   if (!items.length) return;
 
@@ -860,17 +865,9 @@ async function payFromBrowser() {
   payBtn.textContent = 'Paying...';
 
   try {
-    status.textContent = 'Sending payment via tempo request...';
-    const proxyRes = await fetch('http://localhost:8788', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
+    const result = await window.payForOrder(tempoKey, items, (msg) => {
+      status.textContent = msg;
     });
-    if (!proxyRes.ok) {
-      const err = await proxyRes.json().catch(() => ({ error: 'Payment failed' }));
-      throw new Error(err.error || 'Payment failed');
-    }
-    const result = await proxyRes.json();
 
     // Success — replace modal content
     document.getElementById('modal-body').innerHTML =

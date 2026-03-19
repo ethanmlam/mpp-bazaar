@@ -7,6 +7,7 @@ export interface Order {
   items: LineItem[]
   breakdown: PriceBreakdown
   payer: string | null
+  txHash: string | null
   status: 'confirmed'
   createdAt: string
 }
@@ -17,12 +18,14 @@ let orderCounter = 1000
 export function createOrder(
   breakdown: PriceBreakdown,
   payer: string | null,
+  txHash: string | null = null,
 ): Order {
   const order: Order = {
     id: `ORD-${++orderCounter}`,
     items: breakdown.items,
     breakdown,
     payer,
+    txHash,
     status: 'confirmed',
     createdAt: new Date().toISOString(),
   }

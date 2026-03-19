@@ -2,6 +2,11 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { Credential } from 'mppx'
 import { Mppx, tempo } from 'mppx/server'
+
+// pathUSD on Tempo testnet
+const CURRENCY = '0x20c0000000000000000000000000000000000000'
+// Demo recipient — replace with your own address
+const RECIPIENT = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'
 import { menu } from './menu'
 import { computePrice, type OrderItem } from './pricing'
 import { createOrder, getRecentOrders } from './orders'
@@ -12,9 +17,9 @@ const app = new Hono()
 // CORS for frontend
 app.use('/api/*', cors())
 
-// MPP server instance — uses Tempo (pathUSD on testnet by default)
+// MPP server instance — only charge intent (no sessions needed)
 const mppx = Mppx.create({
-  methods: [tempo()],
+  methods: [tempo.charge({ testnet: true })],
 })
 
 // ─── Menu ────────────────────────────────────────────────────────────
@@ -57,7 +62,12 @@ app.post('/api/order', async (c) => {
   }
 
   // Dynamic charge — this is what x402 can't do
-  const response = await mppx.charge({ amount: breakdown.total })(c.req.raw)
+  const response = await mppx.charge({
+    amount: breakdown.total,
+    currency: CURRENCY,
+    recipient: RECIPIENT,
+    description: `MPP Bazaar order: ${breakdown.items.map(i => i.name).join(', ')}`,
+  })(c.req.raw)
 
   // 402: send challenge back to client
   if (response.status === 402) {

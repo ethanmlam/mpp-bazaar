@@ -1,0 +1,10 @@
+name = "mpp-bazaar"
+main = "src/index.ts"
+compatibility_date = "2025-03-15"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+# Set MPP_SECRET_KEY as a secret:
+# npx wrangler secret put MPP_SECRET_KEY

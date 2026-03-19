@@ -1,5 +1,27 @@
 import { Mppx, tempo } from 'mppx/client'
+import { createClient, http } from 'viem'
+import { tempo as tempoChain } from 'viem/chains'
 import { privateKeyToAccount } from 'viem/accounts'
+
+// Single shared client — avoids creating multiple polling connections
+let sharedClient: ReturnType<typeof createClient> | null = null
+
+function getClient() {
+  if (!sharedClient) {
+    sharedClient = createClient({
+      chain: tempoChain,
+      transport: http('https://rpc.tempo.xyz', {
+        batch: true,
+        retryCount: 5,
+        retryDelay: 3000,
+      }),
+      batch: { multicall: true },
+      pollingInterval: 120_000,
+      cacheTime: 120_000,
+    })
+  }
+  return sharedClient
+}
 
 ;(window as any).payForOrder = async function payForOrder(
   privateKey: string,
@@ -12,8 +34,10 @@ import { privateKeyToAccount } from 'viem/accounts'
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   log('Wallet: ' + account.address)
 
+  const client = getClient()
+
   const mppx = Mppx.create({
-    methods: [tempo({ account })],
+    methods: [tempo({ account, getClient: () => client })],
     polyfill: false,
   })
 

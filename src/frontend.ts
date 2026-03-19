@@ -812,29 +812,16 @@ async function placeOrder() {
     bodyHtml += '</div>';
 
     bodyHtml += '<div class="modal-section">';
-    bodyHtml += '<div class="modal-cli"><p>Complete this order via CLI: <span class="copy-btn" id="cli-copy-btn" style="cursor:pointer;font-size:0.75rem;padding:2px 8px;border:1px solid var(--border);border-radius:4px;margin-left:8px;color:var(--accent)">Copy</span></p><code id="cli-cmd-code">' + cliCmd + '</code></div>';
+    bodyHtml += '<div class="modal-cli"><p>Complete this order via CLI:</p><code id="cli-cmd-code">' + cliCmd + '</code></div>';
     bodyHtml += '</div>';
 
     document.getElementById('modal-body').innerHTML = bodyHtml;
     document.getElementById('pay-status').textContent = '';
     const payBtn = document.getElementById('modal-pay-btn');
-    if (tempoKey) {
-      payBtn.style.display = 'inline-block';
-      payBtn.disabled = false;
-      payBtn.textContent = 'Pay Now';
-    } else {
-      payBtn.style.display = 'none';
-    }
+    payBtn.style.display = 'inline-block';
+    payBtn.disabled = false;
+    payBtn.textContent = 'Pay Now';
     document.getElementById('modal-overlay').classList.add('open');
-    var copyBtn = document.getElementById('cli-copy-btn');
-    if (copyBtn) {
-      copyBtn.onclick = function() {
-        var code = document.getElementById('cli-cmd-code');
-        if (code) navigator.clipboard.writeText(code.textContent);
-        copyBtn.textContent = 'Copied!';
-        setTimeout(function() { copyBtn.textContent = 'Copy'; }, 1500);
-      };
-    }
   } catch (e) {
     alert('Error: ' + e.message);
   } finally {
@@ -864,7 +851,6 @@ async function loadFeed() {
 }
 
 async function payFromBrowser() {
-  if (!tempoKey || !window.payForOrder) return;
   const items = Object.entries(cart).map(([id, qty]) => ({ id, qty }));
   if (!items.length) return;
 
@@ -874,9 +860,17 @@ async function payFromBrowser() {
   payBtn.textContent = 'Paying...';
 
   try {
-    const result = await window.payForOrder(tempoKey, items, (msg) => {
-      status.textContent = msg;
+    status.textContent = 'Sending payment via tempo request...';
+    const proxyRes = await fetch('http://localhost:8788', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
     });
+    if (!proxyRes.ok) {
+      const err = await proxyRes.json().catch(() => ({ error: 'Payment failed' }));
+      throw new Error(err.error || 'Payment failed');
+    }
+    const result = await proxyRes.json();
 
     // Success — replace modal content
     document.getElementById('modal-body').innerHTML =
@@ -887,9 +881,8 @@ async function payFromBrowser() {
       + result.items.map(function(i) { return i.qty + 'x ' + i.name; }).join(', ')
       + ' &mdash; $' + result.breakdown.total
       + '</div>'
-      + (result.payer ? '<div class="tx-hash">Payer: ' + result.payer + '</div>' : '')
-      + (result.txHash ? '<div class="tx-hash" style="margin-top:0.5rem">Tx: ' + result.txHash + '</div>' : '')
-      + (result.txHash ? '<div style="margin-top:0.75rem"><a href="https://explore.tempo.xyz/tx/' + result.txHash + '" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;font-size:0.85rem">View transaction on Tempo Explorer &rarr;</a></div>' : '')
+      + (result.txHash ? '<div class="tx-hash" style="margin-top:0.5rem">Tx: ' + result.txHash.substring(0, 10) + '...' + result.txHash.substring(result.txHash.length - 6) + '</div>' : '')
+      + (result.txHash ? '<div style="margin-top:0.75rem"><a href="https://explore.tempo.xyz/receipt/' + result.txHash + '" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;font-size:0.85rem">View transaction on Tempo Explorer &rarr;</a></div>' : '')
       + '</div>';
     document.querySelector('.modal-header .badge-402').textContent = '200';
     document.querySelector('.modal-header .badge-402').style.background = 'var(--green)';
